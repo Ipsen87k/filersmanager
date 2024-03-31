@@ -1,13 +1,17 @@
 use std::{cmp::Ordering, collections::HashMap, fs::{self, Metadata}, path::{Path, PathBuf}};
 
-use iced::{executor, widget::{button, column, container,row, text, text_input, Column}, Application, Command, Element, Renderer, Settings, Theme};
+use iced::{executor, widget::{button, column, container,row, text, text_input, Column}, Application, Command, Element, Font, Renderer, Settings, Theme};
 
 const ONE_KELO_BYTE:f32 = 1024.0;
 const SIX_DIGITS:u64 = 999999;
 const NINE_DIGITS:u64 = 999999999;
 
 fn main() -> iced::Result{
-    AppState::run(Settings::default())
+    AppState::run(Settings{
+        fonts:vec![include_bytes!("../font/FreeSerif.ttf").as_slice().into()],
+        default_font:Font::MONOSPACE,
+        ..Default::default()
+    })
 }
 
 #[derive(Debug,Clone)]
