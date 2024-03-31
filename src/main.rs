@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs::{self, Metadata},  path::{Path, PathBuf}};
+use std::{cmp::Ordering, collections::HashMap, fs::{self, Metadata}, path::{Path, PathBuf}};
 
 use iced::{executor, widget::{button, column, container,row, text, text_input, Column}, Application, Command, Element, Renderer, Settings, Theme};
 
@@ -15,6 +15,7 @@ struct AppState{
     path:Option<PathBuf>,
     path_input_value:String,
     file_info_map:HashMap<PathBuf,u64>,
+    file_info_vec:Vec<(PathBuf,u64)>,
 }
 
 #[derive(Debug,Clone)]
@@ -43,6 +44,7 @@ impl Application for AppState{
                 path:Some(PathBuf::from(r"C:\Users\aagao\OneDrive\デスクトップ")),
                 path_input_value:String::new(),
                 file_info_map:HashMap::new(),
+                file_info_vec:vec![],
             },
             Command::none(),
         )
@@ -61,15 +63,18 @@ impl Application for AppState{
                             let path = entry.path();
                             if let Ok(meta) = entry.metadata(){
                                 if meta.is_file(){
-                                    self.file_info_map.insert(path, meta.len());
+                                    self.file_info_vec.push((path,meta.len()));
+                                    //self.file_info_map.insert(path, meta.len());
                                 }else if meta.is_dir(){
                                     let total_size = serach_file(&path);
-                                    self.file_info_map.insert(path, total_size);
+                                    self.file_info_vec.push((path,total_size));
+                                    //self.file_info_map.insert(path, total_size);
                                 }
                             }
                         }
                     }
                 }
+                self.file_info_vec.sort_by(|a,b| a.1.ancestor_cmp(&b.1));
             }
             Message::None=>{
 
@@ -84,7 +89,7 @@ impl Application for AppState{
 
         let top_control = row!(path_input,run_button);
 
-        if self.file_info_map.is_empty(){
+        if self.file_info_vec.is_empty(){
             container(top_control).into()
         }else{
             let file_infos = widget_list(self.conv_map_to_vec()); 
@@ -101,7 +106,7 @@ impl Application for AppState{
 impl AppState {
     fn conv_map_to_vec(&self)->Vec<String>{
         let mut total_size = 0;
-        let mut ret = self.file_info_map
+        let mut ret = self.file_info_vec
             .iter()
             .map(|(k,v)| {
                 let fsize = *v as f32;
@@ -120,7 +125,7 @@ impl AppState {
             .collect::<Vec<String>>();
         
         let gb_size = total_size as f32 / (ONE_KELO_BYTE*ONE_KELO_BYTE*ONE_KELO_BYTE);
-        ret.push(format!("totalsize    {:.2}GB",gb_size));
+        ret.insert(0,format!("totalsize    {:.2}GB",gb_size));
         ret
     }
 }
@@ -155,3 +160,15 @@ where
         }
         return fsize;
     }
+
+trait CmpExtension {
+    fn ancestor_cmp(&self,other:&u64)->Ordering;
+}
+
+impl CmpExtension for u64 {
+    fn ancestor_cmp(&self,other:&u64)->Ordering {
+        if *self < *other {Ordering::Greater}
+        else if *self == *other {Ordering::Equal}
+        else {Ordering::Less}
+    }
+}
