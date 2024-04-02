@@ -1,6 +1,6 @@
-use std::{cmp::Ordering, collections::HashMap, fs::{self, Metadata}, path::{Path, PathBuf}};
+use std::{cmp::Ordering, fs::{self, Metadata}, path::{Path, PathBuf}};
 
-use iced::{executor, widget::{button, column, container,row, text, text_input, Column}, Application, Command, Element, Font, Renderer, Settings, Theme};
+use iced::{executor,  widget::{button, column, container, row, text, text_editor, text_input, Column},  Application, Command, Element, Font, Length, Renderer, Settings, Theme};
 
 const ONE_KELO_BYTE:f32 = 1024.0;
 const SIX_DIGITS:u64 = 999999;
@@ -14,16 +14,17 @@ fn main() -> iced::Result{
     })
 }
 
-#[derive(Debug,Clone)]
+
 struct AppState{
     path:Option<PathBuf>,
     path_input_value:String,
-    file_info_map:HashMap<PathBuf,u64>,
     file_info_vec:Vec<(PathBuf,u64)>,
+    content:text_editor::Content,
 }
 
 #[derive(Debug,Clone)]
 pub enum Message {
+    TextEditorOnAction(text_editor::Action),
     OnInput(String),
     Run,
     None,
@@ -47,8 +48,8 @@ impl Application for AppState{
             Self{
                 path:Some(PathBuf::from(r"C:\Users\aagao\OneDrive\デスクトップ")),
                 path_input_value:String::new(),
-                file_info_map:HashMap::new(),
                 file_info_vec:vec![],
+                content:text_editor::Content::new(),
             },
             Command::none(),
         )
@@ -57,8 +58,15 @@ impl Application for AppState{
     fn update(&mut self, message: Message) -> Command<Message> {
         match message {
             Message::OnInput(value)=>{
-                self.path = Some(PathBuf::from(&value));
-                self.path_input_value = value;
+                //"c:/temp"=>c:/temp として扱う
+                if value.starts_with('"') && value.ends_with('"'){
+                    let value = &value[1..value.len()-1];
+                    self.path = Some(PathBuf::from(value));
+                    self.path_input_value = String::from(value);
+                }else{
+                    self.path = Some(PathBuf::from(&value));
+                    self.path_input_value = value;
+                }
             }
             Message::Run=>{
                 if let Ok(entries) = fs::read_dir(self.path.as_ref().unwrap()){
@@ -79,9 +87,15 @@ impl Application for AppState{
                     }
                 }
                 self.file_info_vec.sort_by(|a,b| a.1.ancestor_cmp(&b.1));
+                let file_info_str = self.conv_map_to_vec();
+                self.content = text_editor::Content::with_text(file_info_str.join("\n").as_str());
+            }
+            Message::TextEditorOnAction(action)=>{
+                self.content.perform(action);
+
             }
             Message::None=>{
-
+                
             }
         }
         Command::none()
@@ -96,11 +110,15 @@ impl Application for AppState{
         if self.file_info_vec.is_empty(){
             container(top_control).into()
         }else{
-            let file_infos = widget_list(self.conv_map_to_vec()); 
+            // let file_infos_str = self.conv_map_to_vec();
+            // self.content = text_editor::Content::with_text(file_infos_str.join("\n").as_str());
             container(
                 column!(
                     top_control,
-                    file_infos
+                    text_editor(&self.content)
+                        .height(Length::Fill)
+                        .on_action(Message::TextEditorOnAction)
+                        ,
                 )
             ).into()
         }
@@ -134,16 +152,19 @@ impl AppState {
     }
 }
 
+#[allow(dead_code)]
 fn widget_list<'a>(targets:Vec<String>)->Column<'a,Message>{
     let mut vec:Vec<Element<'_, Message, Theme, Renderer>> = vec![];
     
     for (_idx,str) in targets.iter().enumerate(){
         
         let tx = text(str);
+        
         vec.push(tx.into());
     }
     Column::from_vec(vec)
 }
+
 
 fn serach_file<P>(path:P)->u64
 where
