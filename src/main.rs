@@ -1,6 +1,7 @@
 use std::{cmp::Ordering, fs::{self, Metadata}, path::{Path, PathBuf}};
 
-use iced::{executor,  widget::{button, column, container, row, text, text_editor, text_input, Column},  Application, Command, Element, Font, Length, Renderer, Settings, Theme};
+use filersmanager::{file::open_folder, icon};
+use iced::{executor,  widget::{button, column, container, row, text, text_editor, text_input, tooltip, Column},  Application, Command, Element, Font, Length, Renderer, Settings, Theme};
 
 const ONE_KELO_BYTE:f32 = 1024.0;
 const SIX_DIGITS:u64 = 999999;
@@ -8,7 +9,7 @@ const NINE_DIGITS:u64 = 999999999;
 
 fn main() -> iced::Result{
     AppState::run(Settings{
-        fonts:vec![include_bytes!("../font/FreeSerif.ttf").as_slice().into()],
+        fonts:vec![include_bytes!("../font/iced-image.ttf").as_slice().into()],
         default_font:Font::MONOSPACE,
         ..Default::default()
     })
@@ -26,6 +27,8 @@ struct AppState{
 pub enum Message {
     TextEditorOnAction(text_editor::Action),
     OnInput(String),
+    OpenFolder,
+    FolderOpened(Option<PathBuf>),
     Run,
     None,
 }
@@ -92,7 +95,14 @@ impl Application for AppState{
             }
             Message::TextEditorOnAction(action)=>{
                 self.content.perform(action);
-
+            }
+            Message::OpenFolder=>{
+                return Command::perform(open_folder(), Message::FolderOpened);
+            }
+            Message::FolderOpened(path)=>{
+                if let Some(path) = path{
+                    self.path = Some(path);
+                }
             }
             Message::None=>{
                 
@@ -106,15 +116,22 @@ impl Application for AppState{
         let run_button = button("run").on_press(Message::Run);
 
         let top_control = row!(path_input,run_button);
+        let sub_func = row!(
+            create_tooltrip(icon::open_folder_icon(), "開きたいフォルダを選択", Some(Message::OpenFolder))
+        );
 
+        let control = column!(
+            top_control,
+            sub_func
+        );
         if self.file_info_vec.is_empty(){
-            container(top_control).into()
+            container(control).into()
         }else{
             // let file_infos_str = self.conv_map_to_vec();
             // self.content = text_editor::Content::with_text(file_infos_str.join("\n").as_str());
             container(
                 column!(
-                    top_control,
+                    control,
                     text_editor(&self.content)
                         .height(Length::Fill)
                         .on_action(Message::TextEditorOnAction)
@@ -122,6 +139,10 @@ impl Application for AppState{
                 )
             ).into()
         }
+    }
+
+    fn theme(&self) -> Self::Theme {
+        Theme::Dark
     }
 }
 
@@ -134,20 +155,20 @@ impl AppState {
                 let fsize = *v as f32;
                 total_size+=*v;
                 if *v< SIX_DIGITS{
-                    format!("{}     {}bytes",k.file_name().unwrap().to_str().unwrap(),v)
+                    format!("{}\t\t{}bytes",k.file_name().unwrap().to_str().unwrap(),v)
                 }else if SIX_DIGITS < *v && *v < NINE_DIGITS{
                     let mb_size = fsize / (ONE_KELO_BYTE*ONE_KELO_BYTE);
-                    format!("{}     {:.2}MB",k.file_name().unwrap().to_str().unwrap(),mb_size)
+                    format!("{}\t\t{:.2}MB",k.file_name().unwrap().to_str().unwrap(),mb_size)
                 }else{
                     let gb_size = fsize/(ONE_KELO_BYTE*ONE_KELO_BYTE*ONE_KELO_BYTE);
                     
-                    format!("{}     {:.2}GB",k.file_name().unwrap().to_str().unwrap(),gb_size)
+                    format!("{}\t\t{:.2}GB",k.file_name().unwrap().to_str().unwrap(),gb_size)
                 }
             })
             .collect::<Vec<String>>();
         
         let gb_size = total_size as f32 / (ONE_KELO_BYTE*ONE_KELO_BYTE*ONE_KELO_BYTE);
-        ret.insert(0,format!("totalsize    {:.2}GB",gb_size));
+        ret.insert(0,format!("totalsize\t\t{:.2}GB",gb_size));
         ret
     }
 }
@@ -185,6 +206,22 @@ where
         }
         return fsize;
     }
+
+fn create_tooltrip<'a>(content:impl Into<Element<'a,Message>>,label:&'a str,on_press:Option<Message>)->Element<'a,Message>{
+    let btn = button(container(content));
+
+    if let Some(on_press) = on_press{
+        tooltip(
+            btn.on_press(on_press),
+            label,
+            tooltip::Position::FollowCursor,
+        )
+        .into()
+    }else{
+        btn.into()
+    }
+
+}
 
 trait CmpExtension {
     fn ancestor_cmp(&self,other:&u64)->Ordering;
