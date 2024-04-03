@@ -1,7 +1,8 @@
-use std::{cmp::Ordering, fs::{self, Metadata}, path::{Path, PathBuf}};
+use std::{cmp::Ordering, error::Error, fs::{self, Metadata}, path::{Path, PathBuf}};
 
-use filersmanager::{file::open_folder, icon};
+use filersmanager::{file::{open_folder, output_folder_infos}, icon};
 use iced::{executor,  widget::{button, column, container, row, text, text_editor, text_input, tooltip, Column},  Application, Command, Element, Font, Length, Renderer, Settings, Theme};
+use tokio::io;
 
 const ONE_KELO_BYTE:f32 = 1024.0;
 const SIX_DIGITS:u64 = 999999;
@@ -15,6 +16,9 @@ fn main() -> iced::Result{
     })
 }
 
+// pub enum Error {
+//     IoError(io::Error)
+// }
 
 struct AppState{
     path:Option<PathBuf>,
@@ -29,6 +33,8 @@ pub enum Message {
     OnInput(String),
     OpenFolder,
     FolderOpened(Option<PathBuf>),
+    OutputFileInfos,
+    OutputedFileInfosSaved(PathBuf),
     Run,
     None,
 }
@@ -72,6 +78,9 @@ impl Application for AppState{
                 }
             }
             Message::Run=>{
+                //二回目初期化
+                self.file_info_vec.clear();
+
                 if let Ok(entries) = fs::read_dir(self.path.as_ref().unwrap()){
                     for entry in entries{
                         if let  Ok(entry) = entry{
@@ -104,6 +113,18 @@ impl Application for AppState{
                     self.path = Some(path);
                 }
             }
+            //もっとスムーズに描く
+            Message::OutputFileInfos=>{
+                let text = self.content.text();
+                if text.is_empty(){
+                    return Command::none();
+                }else{
+                    return Command::perform(output_folder_infos(text),Message::OutputedFileInfosSaved)
+                }
+            }
+            Message::OutputedFileInfosSaved(_path)=>{
+
+            }
             Message::None=>{
                 
             }
@@ -117,7 +138,8 @@ impl Application for AppState{
 
         let top_control = row!(path_input,run_button);
         let sub_func = row!(
-            create_tooltrip(icon::open_folder_icon(), "開きたいフォルダを選択", Some(Message::OpenFolder))
+            create_tooltrip(icon::open_folder_icon(), "開きたいフォルダを選択", Some(Message::OpenFolder)),
+            create_tooltrip(icon::output_icon(), "出力", Some(Message::OutputFileInfos)),
         );
 
         let control = column!(
