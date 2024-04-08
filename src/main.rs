@@ -1,8 +1,7 @@
-use std::{cmp::Ordering, error::Error, fs::{self, Metadata}, path::{Path, PathBuf}};
+use std::{cmp::Ordering, fs::{self,}, path::{Path, PathBuf}, vec};
 
 use filersmanager::{file::{open_folder, output_folder_infos}, icon};
 use iced::{executor,  widget::{button, column, container, row, text, text_editor, text_input, tooltip, Column},  Application, Command, Element, Font, Length, Renderer, Settings, Theme};
-use tokio::io;
 
 const ONE_KELO_BYTE:f32 = 1024.0;
 const SIX_DIGITS:u64 = 999999;
@@ -35,7 +34,9 @@ pub enum Message {
     FolderOpened(Option<PathBuf>),
     OutputFileInfos,
     OutputedFileInfosSaved(PathBuf),
-    Run,
+    FileSearch,
+    FileSerachedConvert(Vec<(PathBuf,u64)>),
+    FileSeached(Vec<String>),
     None,
 }
 
@@ -70,37 +71,32 @@ impl Application for AppState{
                 //"c:/temp"=>c:/temp として扱う
                 if value.starts_with('"') && value.ends_with('"'){
                     let value = &value[1..value.len()-1];
-                    self.path = Some(PathBuf::from(value));
                     self.path_input_value = String::from(value);
                 }else{
-                    self.path = Some(PathBuf::from(&value));
                     self.path_input_value = value;
                 }
             }
-            Message::Run=>{
+            Message::FileSearch=>{
                 //二回目初期化
                 self.file_info_vec.clear();
-
-                if let Ok(entries) = fs::read_dir(self.path.as_ref().unwrap()){
-                    for entry in entries{
-                        if let  Ok(entry) = entry{
-                            let path = entry.path();
-                            if let Ok(meta) = entry.metadata(){
-                                if meta.is_file(){
-                                    self.file_info_vec.push((path,meta.len()));
-                                    //self.file_info_map.insert(path, meta.len());
-                                }else if meta.is_dir(){
-                                    let total_size = serach_file(&path);
-                                    self.file_info_vec.push((path,total_size));
-                                    //self.file_info_map.insert(path, total_size);
-                                }
-                            }
-                        }
-                    }
+                if self.path_input_value.is_empty(){
+                    return Command::none();
                 }
-                self.file_info_vec.sort_by(|a,b| a.1.ancestor_cmp(&b.1));
-                let file_info_str = self.conv_map_to_vec();
-                self.content = text_editor::Content::with_text(file_info_str.join("\n").as_str());
+                let path = PathBuf::from(&self.path_input_value);
+                if path.exists(){
+                    self.path = Some(path.clone());
+                    self.file_info_vec.clear();
+
+                    return Command::perform(filesize_collect(path), Message::FileSerachedConvert);
+                }
+            }
+            Message::FileSerachedConvert(mut value)=>{
+                value.sort_by(|a,b| a.1.ancestor_cmp(&b.1));
+                self.file_info_vec = value.clone();
+                return Command::perform(conv_fileinfovec_to_strvec(value), Message::FileSeached);
+            }
+            Message::FileSeached(value)=>{
+                self.content = text_editor::Content::with_text(value.join("\n").as_str());
             }
             Message::TextEditorOnAction(action)=>{
                 self.content.perform(action);
@@ -134,7 +130,7 @@ impl Application for AppState{
 
     fn view(&self) -> iced::Element<'_, Message> {
         let path_input = text_input("please input pass", &self.path_input_value).on_input(Message::OnInput);
-        let run_button = button("run").on_press(Message::Run);
+        let run_button = button("run").on_press(Message::FileSearch);
 
         let top_control = row!(path_input,run_button);
         let sub_func = row!(
@@ -158,6 +154,7 @@ impl Application for AppState{
                         .height(Length::Fill)
                         .on_action(Message::TextEditorOnAction)
                         ,
+                    text(self.path.as_ref().unwrap().display()),
                 )
             ).into()
         }
@@ -208,10 +205,35 @@ fn widget_list<'a>(targets:Vec<String>)->Column<'a,Message>{
     Column::from_vec(vec)
 }
 
+async fn conv_fileinfovec_to_strvec(vec:Vec<(PathBuf,u64)>)->Vec<String>{
+    let mut total_size = 0;
+    let mut fileinfo_str_vec= vec
+        .iter()
+        .map(|(k,v)| {
+            let fsize = *v as f32;
+            total_size+=*v;
+            if *v< SIX_DIGITS{
+                format!("{}\t\t{}bytes",k.file_name().unwrap().to_str().unwrap(),v)
+            }else if SIX_DIGITS < *v && *v < NINE_DIGITS{
+                let mb_size = fsize / (ONE_KELO_BYTE*ONE_KELO_BYTE);
+                format!("{}\t\t{:.2}MB",k.file_name().unwrap().to_str().unwrap(),mb_size)
+            }else{
+                let gb_size = fsize/(ONE_KELO_BYTE*ONE_KELO_BYTE*ONE_KELO_BYTE);
+                
+                format!("{}\t\t{:.2}GB",k.file_name().unwrap().to_str().unwrap(),gb_size)
+            }
+        })
+        .collect::<Vec<String>>();
+    
+    let gb_size = total_size as f32 / (ONE_KELO_BYTE*ONE_KELO_BYTE*ONE_KELO_BYTE);
+    fileinfo_str_vec.insert(0,format!("totalsize\t\t{:.2}GB",gb_size));
+    fileinfo_str_vec
+}
 
 fn serach_file<P>(path:P)->u64
 where
     P:AsRef<Path>{
+        
         let mut fsize = 0;
         if let Ok(entries) = fs::read_dir(path) {
             for entry in entries{
@@ -228,6 +250,30 @@ where
         }
         return fsize;
     }
+async fn filesize_collect<P>(path:P)->Vec<(PathBuf,u64)>
+where
+    P:AsRef<Path>{
+        let mut file_info_vec = vec![];
+        if let Ok(entries) = fs::read_dir(path){
+            for entry in entries{
+                if let  Ok(entry) = entry{
+                    let path = entry.path();
+                    if let Ok(meta) = entry.metadata(){
+                        if meta.is_file(){
+                            file_info_vec.push((path,meta.len()));
+                            //self.file_info_map.insert(path, meta.len());
+                        }else if meta.is_dir(){
+                            let total_size = serach_file(&path);
+                            file_info_vec.push((path,total_size));
+                            //self.file_info_map.insert(path, total_size);
+                        }
+                    }
+                }
+            }
+        }
+        file_info_vec
+    }
+
 
 fn create_tooltrip<'a>(content:impl Into<Element<'a,Message>>,label:&'a str,on_press:Option<Message>)->Element<'a,Message>{
     let btn = button(container(content));

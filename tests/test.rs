@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, collections::HashMap, error::Error, fs, path::{Path, PathBuf}};
+use std::{cmp::Ordering, collections::HashMap, error::Error, fs, future::Future, path::{Path, PathBuf}};
 
 
 const DESKTOP_PATH:&str=r"C:\Users\aagao\OneDrive\デスクトップ";
@@ -23,6 +23,27 @@ where
         }
         return fsize;
     }
+
+// #[async_recursion]
+// async fn search_file_async<P>(path:P)->u64
+// where
+//     P:AsRef<Path>
+//     {
+//         let mut fsize=0;
+//         if let Ok(mut entries)= tokio::fs::read_dir(path).await{
+//             while let Some(entry) = entries.next_entry().await.unwrap() {
+//                 if let Ok(meta) = entry.metadata().await {
+//                     if meta.is_file(){
+//                         fsize+=meta.len();
+//                     }else if meta.is_dir(){
+//                         fsize+=search_file_async(entry.path()).await;
+//                     }
+//                 }
+//             }
+//         }
+
+//         fsize
+//     }
 
 #[test]
 fn test_sort()->O{
