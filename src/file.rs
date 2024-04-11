@@ -1,6 +1,6 @@
 use std::{path::{Path, PathBuf}};
 
-use crate::error::Error;
+use crate::{error::Error, Null};
 
 pub async fn open_folder()->Option<PathBuf>{
     let picked_path = rfd::AsyncFileDialog::new()
@@ -16,7 +16,7 @@ pub async fn open_folder()->Option<PathBuf>{
     }
 }
 
-pub async fn output_folder_infos(content:String)->PathBuf{
+pub async fn output_folder_infos(content:String)->Result<(),Error>{
     let path = rfd::AsyncFileDialog::new()
         .save_file()
         .await
@@ -25,13 +25,11 @@ pub async fn output_folder_infos(content:String)->PathBuf{
         .map(Path::to_owned);
 
     if let Some(path) = path{
-        let r = tokio::fs::write(&path, content)
-            .await;
-        if let Ok(_r)=r{
-
-        }
+        tokio::fs::write(&path, content)
+            .await
+            .map_err(|e| Error::AsyncTokioIoError(e.kind()))?;
     }
-    PathBuf::new()
+    Ok(())
 }
 
 pub async fn remove_file_dialog(path:PathBuf)->Result<(),Error>{
@@ -60,11 +58,13 @@ pub async fn remove_file_dialog(path:PathBuf)->Result<(),Error>{
     Ok(())
 }
 
-pub async fn error_dialog_show(e:Error){
+pub async fn error_dialog_show(e:Error)->Null{
     let _ = rfd::AsyncMessageDialog::new()
         .set_level(rfd::MessageLevel::Error)
         .set_description(format!("{}",e))
         .set_title("Error")
         .show()
         .await;
+
+    Null{}
 }

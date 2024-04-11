@@ -26,6 +26,7 @@ struct AppState{
     content:text_editor::Content,
 }
 
+
 #[derive(Debug,Clone)]
 pub enum Message {
     TextEditorOnAction(text_editor::Action),
@@ -33,13 +34,12 @@ pub enum Message {
     OpenFolder,
     FolderOpened(Option<PathBuf>),
     OutputFileInfos,
-    OutputedFileInfosSaved(PathBuf),
     FileSearch,
     FileSerachedConvert(Vec<(PathBuf,u64)>),
     FileSeached(Vec<String>),
     EventOccured(iced::event::Event),
-    FileRemoved(Result<(),Error>),
-    None,
+    ErrorDialogShow(Result<(),Error>),
+    None(filersmanager::Null),
 }
 
 
@@ -107,8 +107,13 @@ impl Application for AppState{
             }
             Message::TextEditorOnAction(action)=>{
                 if let text_editor::Action::Edit(edit) = action.clone(){
-                    if edit == text_editor::Edit::Backspace || edit == text_editor::Edit::Delete{
-                        return Command::none();
+                    //fallthrough Pasteのみaction起こす
+                    match edit {
+                        text_editor::Edit::Paste(_v)=>{
+                        }
+                        _=>{
+                            return Command::none();
+                        }
                     }
                 }
                 self.content.perform(action);
@@ -121,17 +126,13 @@ impl Application for AppState{
                     self.path = Some(path);
                 }
             }
-            //もっとスムーズに描く
             Message::OutputFileInfos=>{
                 let text = self.content.text();
                 if text.is_empty(){
                     return Command::none();
                 }else{
-                    return Command::perform(output_folder_infos(text),Message::OutputedFileInfosSaved)
+                    return Command::perform(output_folder_infos(text),Message::ErrorDialogShow)
                 }
-            }
-            Message::OutputedFileInfosSaved(_path)=>{
-
             }
             Message::EventOccured(event)=>{
                 match event {
@@ -151,7 +152,7 @@ impl Application for AppState{
                                         let filename = selected_file.split('\t').collect::<Vec<&str>>();
                                         let filename = String::from(filename[0]);
                                         let path = self.path.as_ref().unwrap().join(filename);
-                                        return Command::perform(file::remove_file_dialog(path), Message::FileRemoved);
+                                        return Command::perform(file::remove_file_dialog(path), Message::ErrorDialogShow);
                                     }
                                 }
                             },
@@ -167,12 +168,12 @@ impl Application for AppState{
                     },
                 }
             }
-            Message::FileRemoved(result)=>{
+            Message::ErrorDialogShow(result)=>{
                 if let Err(e) = result  {
-                    println!("{}",e);
+                    return Command::perform(file::error_dialog_show(e), Message::None);
                 }
             }
-            Message::None=>{
+            Message::None(_null)=>{
                 
             }
         }
