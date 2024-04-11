@@ -106,6 +106,11 @@ impl Application for AppState{
                 self.content = text_editor::Content::with_text(value.join("\n").as_str());
             }
             Message::TextEditorOnAction(action)=>{
+                if let text_editor::Action::Edit(edit) = action.clone(){
+                    if edit == text_editor::Edit::Backspace || edit == text_editor::Edit::Delete{
+                        return Command::none();
+                    }
+                }
                 self.content.perform(action);
             }
             Message::OpenFolder=>{
