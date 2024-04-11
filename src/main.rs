@@ -1,7 +1,7 @@
 use std::{cmp::Ordering, fs::{self,}, path::{Path, PathBuf}, vec};
 
-use filersmanager::{file::{open_folder, output_folder_infos}, icon};
-use iced::{executor,  widget::{button, column, container, row, text, text_editor, text_input, tooltip, Column},  Application, Command, Element, Font, Length, Renderer, Settings, Theme};
+use filersmanager::{file::{self, open_folder, output_folder_infos}, icon,error::Error};
+use iced::{executor, mouse, widget::{button, column, container, row, text, text_editor, text_input, tooltip, Column}, window, Application, Command, Element, Font, Length, Renderer, Settings, Theme};
 
 const ONE_KELO_BYTE:f32 = 1024.0;
 const SIX_DIGITS:u64 = 999999;
@@ -37,8 +37,11 @@ pub enum Message {
     FileSearch,
     FileSerachedConvert(Vec<(PathBuf,u64)>),
     FileSeached(Vec<String>),
+    EventOccured(iced::event::Event),
+    FileRemoved(Result<(),Error>),
     None,
 }
+
 
 impl Application for AppState{
     type Executor = executor::Default;
@@ -79,15 +82,19 @@ impl Application for AppState{
             Message::FileSearch=>{
                 //二回目初期化
                 self.file_info_vec.clear();
-                if self.path_input_value.is_empty(){
-                    return Command::none();
-                }
-                let path = PathBuf::from(&self.path_input_value);
-                if path.exists(){
-                    self.path = Some(path.clone());
-                    self.file_info_vec.clear();
-
-                    return Command::perform(filesize_collect(path), Message::FileSerachedConvert);
+                if let Some(path) = self.path.as_ref() {
+                    if path.exists(){
+                        if self.path_input_value.is_empty(){
+                            let path = PathBuf::from(path);
+                            return Command::perform(filesize_collect(path), Message::FileSerachedConvert);
+                        }else{
+                            let path = PathBuf::from(&self.path_input_value);
+                            if path.exists(){
+                                self.path = Some(path.clone());
+                                return Command::perform(filesize_collect(path), Message::FileSerachedConvert);
+                            }
+                        }
+                    }
                 }
             }
             Message::FileSerachedConvert(mut value)=>{
@@ -121,6 +128,45 @@ impl Application for AppState{
             Message::OutputedFileInfosSaved(_path)=>{
 
             }
+            Message::EventOccured(event)=>{
+                match event {
+                    iced::Event::Keyboard(_) => {
+
+                    },
+                    iced::Event::Mouse(mouse_event) => {
+                        match mouse_event {
+                            mouse::Event::CursorEntered => {},
+                            mouse::Event::CursorLeft => {},
+                            mouse::Event::CursorMoved { position } => {
+                            },
+                            mouse::Event::ButtonPressed(btn) => {
+                                if btn == iced::mouse::Button::Right{
+                                    self.content.perform(text_editor::Action::SelectLine);
+                                    if let Some(selected_file) = self.content.selection(){
+                                        let filename = selected_file.split('\t').collect::<Vec<&str>>();
+                                        let filename = String::from(filename[0]);
+                                        let path = self.path.as_ref().unwrap().join(filename);
+                                        return Command::perform(file::remove_file_dialog(path), Message::FileRemoved);
+                                    }
+                                }
+                            },
+                            mouse::Event::ButtonReleased(_) => {},
+                            mouse::Event::WheelScrolled { delta } => {
+                            },
+                        }
+                    },
+                    iced::Event::Window(_, _) => {
+                    },
+                    iced::Event::Touch(_) => {
+
+                    },
+                }
+            }
+            Message::FileRemoved(result)=>{
+                if let Err(e) = result  {
+                    println!("{}",e);
+                }
+            }
             Message::None=>{
                 
             }
@@ -145,8 +191,6 @@ impl Application for AppState{
         if self.file_info_vec.is_empty(){
             container(control).into()
         }else{
-            // let file_infos_str = self.conv_map_to_vec();
-            // self.content = text_editor::Content::with_text(file_infos_str.join("\n").as_str());
             container(
                 column!(
                     control,
@@ -158,6 +202,10 @@ impl Application for AppState{
                 )
             ).into()
         }
+    }
+
+    fn subscription(&self) -> iced::Subscription<Message> {
+        iced::event::listen().map(Message::EventOccured)
     }
 
     fn theme(&self) -> Self::Theme {
@@ -174,14 +222,14 @@ impl AppState {
                 let fsize = *v as f32;
                 total_size+=*v;
                 if *v< SIX_DIGITS{
-                    format!("{}\t\t{}bytes",k.file_name().unwrap().to_str().unwrap(),v)
+                    format!("{}\t{}bytes",k.file_name().unwrap().to_str().unwrap(),v)
                 }else if SIX_DIGITS < *v && *v < NINE_DIGITS{
                     let mb_size = fsize / (ONE_KELO_BYTE*ONE_KELO_BYTE);
-                    format!("{}\t\t{:.2}MB",k.file_name().unwrap().to_str().unwrap(),mb_size)
+                    format!("{}\t{:.2}MB",k.file_name().unwrap().to_str().unwrap(),mb_size)
                 }else{
                     let gb_size = fsize/(ONE_KELO_BYTE*ONE_KELO_BYTE*ONE_KELO_BYTE);
                     
-                    format!("{}\t\t{:.2}GB",k.file_name().unwrap().to_str().unwrap(),gb_size)
+                    format!("{}\t{:.2}GB",k.file_name().unwrap().to_str().unwrap(),gb_size)
                 }
             })
             .collect::<Vec<String>>();
@@ -213,14 +261,14 @@ async fn conv_fileinfovec_to_strvec(vec:Vec<(PathBuf,u64)>)->Vec<String>{
             let fsize = *v as f32;
             total_size+=*v;
             if *v< SIX_DIGITS{
-                format!("{}\t\t{}bytes",k.file_name().unwrap().to_str().unwrap(),v)
+                format!("{}\t{}bytes",k.file_name().unwrap().to_str().unwrap(),v)
             }else if SIX_DIGITS < *v && *v < NINE_DIGITS{
                 let mb_size = fsize / (ONE_KELO_BYTE*ONE_KELO_BYTE);
-                format!("{}\t\t{:.2}MB",k.file_name().unwrap().to_str().unwrap(),mb_size)
+                format!("{}\t{:.2}MB",k.file_name().unwrap().to_str().unwrap(),mb_size)
             }else{
                 let gb_size = fsize/(ONE_KELO_BYTE*ONE_KELO_BYTE*ONE_KELO_BYTE);
                 
-                format!("{}\t\t{:.2}GB",k.file_name().unwrap().to_str().unwrap(),gb_size)
+                format!("{}\t{:.2}GB",k.file_name().unwrap().to_str().unwrap(),gb_size)
             }
         })
         .collect::<Vec<String>>();
