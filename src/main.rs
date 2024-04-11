@@ -15,10 +15,6 @@ fn main() -> iced::Result{
     })
 }
 
-// pub enum Error {
-//     IoError(io::Error)
-// }
-
 struct AppState{
     path:Option<PathBuf>,
     path_input_value:String,
@@ -216,33 +212,6 @@ impl Application for AppState{
 
     fn theme(&self) -> Self::Theme {
         Theme::Dark
-    }
-}
-
-impl AppState {
-    fn conv_map_to_vec(&self)->Vec<String>{
-        let mut total_size = 0;
-        let mut ret = self.file_info_vec
-            .iter()
-            .map(|(k,v)| {
-                let fsize = *v as f32;
-                total_size+=*v;
-                if *v< SIX_DIGITS{
-                    format!("{}\t{}bytes",k.file_name().unwrap().to_str().unwrap(),v)
-                }else if SIX_DIGITS < *v && *v < NINE_DIGITS{
-                    let mb_size = fsize / (ONE_KELO_BYTE*ONE_KELO_BYTE);
-                    format!("{}\t{:.2}MB",k.file_name().unwrap().to_str().unwrap(),mb_size)
-                }else{
-                    let gb_size = fsize/(ONE_KELO_BYTE*ONE_KELO_BYTE*ONE_KELO_BYTE);
-                    
-                    format!("{}\t{:.2}GB",k.file_name().unwrap().to_str().unwrap(),gb_size)
-                }
-            })
-            .collect::<Vec<String>>();
-        
-        let gb_size = total_size as f32 / (ONE_KELO_BYTE*ONE_KELO_BYTE*ONE_KELO_BYTE);
-        ret.insert(0,format!("totalsize\t\t{:.2}GB",gb_size));
-        ret
     }
 }
 
