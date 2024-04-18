@@ -201,7 +201,7 @@ impl Application for AppState{
 
     fn view(&self) -> iced::Element<'_, Message> {
         let path_input = text_input("please input pass", &self.path_input_value).on_input(Message::OnInput);
-        let run_button = button("run").on_press(Message::FileSearch);
+        let run_button = button(container(icon::search_icon())).on_press(Message::FileSearch);
 
         let top_control = row!(path_input,run_button);
         let sub_func = row!(
