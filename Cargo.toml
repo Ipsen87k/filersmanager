@@ -1,13 +1,19 @@
 [package]
 name = "filersmanager"
-version = "0.1.0"
+version = "1.1.0"
 edition = "2021"
+authors = ["Ipsen87k <gyt3218@gmail.com>"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 async-recursion = "1.1.0"
-iced = {version = "0.12.1" , features = ["debug","tokio"]}
+env_logger = "0.11.3"
+iced = {version = "0.12.1" , features = ["debug","tokio","image"]}
+log = "0.4.21"
 rfd = "0.14.1"
 tokio = {version = "1.37.0", features = ["fs"]}
 winapi = {version = "0.3.9", features = ["wincon", "winuser"]}
+
+[profile.release]
+opt-level = 3

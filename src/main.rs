@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, fs, path::{Path, PathBuf}, vec};
+use std::{cmp::Ordering, env, fs, path::{Path, PathBuf}, vec};
 
 use filersmanager::{file::{self, open_folder, output_folder_infos}, icon,error::Error};
 use iced::{executor, mouse, widget::{button, column, container, row, text, text_editor, text_input, tooltip, Column}, Application, Command, Element, Font, Length, Renderer, Settings, Theme};
@@ -9,11 +9,28 @@ const NINE_DIGITS:u64 = 999999999;
 
 fn main() -> iced::Result{
     hide_console_window();
-    AppState::run(Settings{
-        fonts:vec![include_bytes!("../font/iced-image.ttf").as_slice().into()],
-        default_font:Font::MONOSPACE,
-        ..Default::default()
-    })
+    env_logger::init_from_env(env_logger::Env::new().default_filter_or("error"));
+
+    let icon = iced::window::icon::from_file_data(include_bytes!("../assets/icon/frsm_icon.jpg"), None);
+    if let Ok(icon) = icon{
+        log::info!("iconあり");
+        AppState::run(Settings{
+            fonts:vec![include_bytes!("../assets/font/iced-image.ttf").as_slice().into()],
+            default_font:Font::MONOSPACE,
+            window:iced::window::Settings{
+                icon:Some(icon),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+    }else{
+        log::info!("iconなし");
+        AppState::run(Settings{
+            fonts:vec![include_bytes!("../assets/font/iced-image.ttf").as_slice().into()],
+            default_font:Font::MONOSPACE,
+            ..Default::default()
+        })
+    }
 }
 
 fn hide_console_window(){
@@ -189,6 +206,7 @@ impl Application for AppState{
             }
             Message::ErrorDialogShow(result)=>{
                 if let Err(e) = result  {
+                    log::error!("{}",e);
                     return Command::perform(file::error_dialog_show(e), Message::None);
                 }
             }
