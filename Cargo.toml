@@ -10,3 +10,4 @@ async-recursion = "1.1.0"
 iced = {version = "0.12.1" , features = ["debug","tokio"]}
 rfd = "0.14.1"
 tokio = {version = "1.37.0", features = ["fs"]}
+winapi = {version = "0.3.9", features = ["wincon", "winuser"]}

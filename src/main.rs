@@ -1,18 +1,36 @@
-use std::{cmp::Ordering, fs::{self,}, path::{Path, PathBuf}, vec};
+use std::{cmp::Ordering, fs, path::{Path, PathBuf}, vec};
 
 use filersmanager::{file::{self, open_folder, output_folder_infos}, icon,error::Error};
-use iced::{executor, mouse, widget::{button, column, container, row, text, text_editor, text_input, tooltip, Column}, window, Application, Command, Element, Font, Length, Renderer, Settings, Theme};
+use iced::{executor, mouse, widget::{button, column, container, row, text, text_editor, text_input, tooltip, Column}, Application, Command, Element, Font, Length, Renderer, Settings, Theme};
 
 const ONE_KELO_BYTE:f32 = 1024.0;
 const SIX_DIGITS:u64 = 999999;
 const NINE_DIGITS:u64 = 999999999;
 
 fn main() -> iced::Result{
+    hide_console_window();
     AppState::run(Settings{
         fonts:vec![include_bytes!("../font/iced-image.ttf").as_slice().into()],
         default_font:Font::MONOSPACE,
         ..Default::default()
     })
+}
+
+fn hide_console_window(){
+    // use std::ptr;
+    // use winapi::um::wincon::GetConsoleWindow;
+    // use winapi::um::winuser::{ShowWindow,SW_HIDE};
+
+    // let window = unsafe {
+    //     GetConsoleWindow()
+    // };
+
+    // if window != ptr::null_mut(){
+    //     unsafe{
+    //         ShowWindow(window, SW_HIDE);
+    //     }
+    // }
+    unsafe{winapi::um::wincon::FreeConsole()};
 }
 
 struct AppState{
@@ -55,7 +73,7 @@ impl Application for AppState{
     fn new(_flags: Self::Flags) -> (Self, iced::Command<Message>) {
         (
             Self{
-                path:Some(PathBuf::from(r"C:\Users\aagao\OneDrive\デスクトップ")),
+                path:Some(PathBuf::from("")),
                 path_input_value:String::new(),
                 file_info_vec:vec![],
                 content:text_editor::Content::new(),
@@ -102,7 +120,12 @@ impl Application for AppState{
                 self.content = text_editor::Content::with_text(value.join("\n").as_str());
             }
             Message::TextEditorOnAction(action)=>{
-                if let text_editor::Action::Edit(edit) = action.clone(){
+                if let text_editor::Action::Click(_p) = action.clone(){
+                    self.content.perform(action);
+                    self.content.perform(text_editor::Action::SelectLine);
+                    return Command::none()
+                }
+                else if let text_editor::Action::Edit(edit) = action.clone(){
                     //fallthrough Pasteのみaction起こす
                     match edit {
                         text_editor::Edit::Paste(_v)=>{
@@ -170,7 +193,7 @@ impl Application for AppState{
                 }
             }
             Message::None(_null)=>{
-                
+
             }
         }
         Command::none()
@@ -218,11 +241,11 @@ impl Application for AppState{
 #[allow(dead_code)]
 fn widget_list<'a>(targets:Vec<String>)->Column<'a,Message>{
     let mut vec:Vec<Element<'_, Message, Theme, Renderer>> = vec![];
-    
+
     for (_idx,str) in targets.iter().enumerate(){
-        
+
         let tx = text(str);
-        
+
         vec.push(tx.into());
     }
     Column::from_vec(vec)
@@ -242,12 +265,12 @@ async fn conv_fileinfovec_to_strvec(vec:Vec<(PathBuf,u64)>)->Vec<String>{
                 format!("{}\t{:.2}MB",k.file_name().unwrap().to_str().unwrap(),mb_size)
             }else{
                 let gb_size = fsize/(ONE_KELO_BYTE*ONE_KELO_BYTE*ONE_KELO_BYTE);
-                
+
                 format!("{}\t{:.2}GB",k.file_name().unwrap().to_str().unwrap(),gb_size)
             }
         })
         .collect::<Vec<String>>();
-    
+
     let gb_size = total_size as f32 / (ONE_KELO_BYTE*ONE_KELO_BYTE*ONE_KELO_BYTE);
     fileinfo_str_vec.insert(0,format!("totalsize\t\t{:.2}GB",gb_size));
     fileinfo_str_vec
@@ -256,7 +279,7 @@ async fn conv_fileinfovec_to_strvec(vec:Vec<(PathBuf,u64)>)->Vec<String>{
 fn serach_file<P>(path:P)->u64
 where
     P:AsRef<Path>{
-        
+
         let mut fsize = 0;
         if let Ok(entries) = fs::read_dir(path) {
             for entry in entries{
@@ -284,11 +307,9 @@ where
                     if let Ok(meta) = entry.metadata(){
                         if meta.is_file(){
                             file_info_vec.push((path,meta.len()));
-                            //self.file_info_map.insert(path, meta.len());
                         }else if meta.is_dir(){
                             let total_size = serach_file(&path);
                             file_info_vec.push((path,total_size));
-                            //self.file_info_map.insert(path, total_size);
                         }
                     }
                 }
@@ -313,7 +334,39 @@ fn create_tooltrip<'a>(content:impl Into<Element<'a,Message>>,label:&'a str,on_p
     }
 
 }
+// async fn read_dir_meta<P>(path:P)->Result<(),std::io::Error>
+// where
+//     P:AsRef<Path>{
+//         let mut entries = tokio::fs::read_dir(path).await?;
+//         while let Some(entry) = entries.next_entry().await? {
+//             let path = entry.path();
+//             let meta = entry.metadata().await?;
+//             if meta.is_file(){
 
+//             }else if meta.is_dir(){
+
+//             }
+//         }
+//         Ok(())
+//     }
+
+// #[async_recursion]
+// async fn search_f<P>(path:P)->io::Result<u64>
+// where
+//     P:AsRef<Path>{
+//         let mut fsize:u64=0;
+//         let mut entries = tokio::fs::read_dir(path).await;
+//         while let Some(entry) = entries.next_entry().await? {
+//             let meta = entry.metadata().await?;
+//             if meta.is_file(){
+//                 fsize+=meta.len();
+//             }else if meta.is_dir(){
+//                 fsize+=search_f(&entry.path()).await?;
+//             }
+//         }
+
+//         Ok(())
+//     }
 trait CmpExtension {
     fn ancestor_cmp(&self,other:&u64)->Ordering;
 }
