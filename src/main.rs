@@ -1,3 +1,4 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 use std::{cmp::Ordering, env, fs, path::{Path, PathBuf}, vec};
 
 use filersmanager::{file::{self, open_folder, output_folder_infos}, icon,error::Error};
@@ -8,7 +9,6 @@ const SIX_DIGITS:u64 = 999999;
 const NINE_DIGITS:u64 = 999999999;
 
 fn main() -> iced::Result{
-    //hide_console_window();
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("error"));
 
     let icon = iced::window::icon::from_file_data(include_bytes!("../assets/icon/frsm_icon.jpg"), None);
@@ -33,10 +33,6 @@ fn main() -> iced::Result{
     }
 }
 
-// fn hide_console_window(){
-
-//     unsafe{winapi::um::wincon::FreeConsole()};
-// }
 
 struct AppState{
     path:Option<PathBuf>,
@@ -147,7 +143,8 @@ impl Application for AppState{
             }
             Message::FolderOpened(path)=>{
                 if let Some(path) = path{
-                    self.path = Some(path);
+                    self.path = Some(path.clone());
+                    return Command::perform(filesize_collect(path), Message::FileSerachedConvert);
                 }
             }
             Message::OutputFileInfos=>{
