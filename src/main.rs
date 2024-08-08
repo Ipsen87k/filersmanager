@@ -8,7 +8,7 @@ const SIX_DIGITS:u64 = 999999;
 const NINE_DIGITS:u64 = 999999999;
 
 fn main() -> iced::Result{
-    hide_console_window();
+    //hide_console_window();
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("error"));
 
     let icon = iced::window::icon::from_file_data(include_bytes!("../assets/icon/frsm_icon.jpg"), None);
@@ -33,22 +33,10 @@ fn main() -> iced::Result{
     }
 }
 
-fn hide_console_window(){
-    // use std::ptr;
-    // use winapi::um::wincon::GetConsoleWindow;
-    // use winapi::um::winuser::{ShowWindow,SW_HIDE};
+// fn hide_console_window(){
 
-    // let window = unsafe {
-    //     GetConsoleWindow()
-    // };
-
-    // if window != ptr::null_mut(){
-    //     unsafe{
-    //         ShowWindow(window, SW_HIDE);
-    //     }
-    // }
-    unsafe{winapi::um::wincon::FreeConsole()};
-}
+//     unsafe{winapi::um::wincon::FreeConsole()};
+// }
 
 struct AppState{
     path:Option<PathBuf>,

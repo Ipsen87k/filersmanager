@@ -13,7 +13,6 @@ iced = {version = "0.12.1" , features = ["debug","tokio","image"]}
 log = "0.4.21"
 rfd = "0.14.1"
 tokio = {version = "1.37.0", features = ["fs"]}
-winapi = {version = "0.3.9", features = ["wincon", "winuser"]}
 
 [profile.release]
 opt-level = 3
