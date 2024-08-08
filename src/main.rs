@@ -57,7 +57,6 @@ pub enum Message {
     None(filersmanager::Null),
 }
 
-
 impl Application for AppState{
     type Executor = executor::Default;
 
@@ -164,7 +163,7 @@ impl Application for AppState{
                         match mouse_event {
                             mouse::Event::CursorEntered => {},
                             mouse::Event::CursorLeft => {},
-                            mouse::Event::CursorMoved { position } => {
+                            mouse::Event::CursorMoved { position:_ } => {
                             },
                             mouse::Event::ButtonPressed(btn) => {
                                 if btn == iced::mouse::Button::Right{
@@ -178,7 +177,7 @@ impl Application for AppState{
                                 }
                             },
                             mouse::Event::ButtonReleased(_) => {},
-                            mouse::Event::WheelScrolled { delta } => {
+                            mouse::Event::WheelScrolled { delta :_} => {
                             },
                         }
                     },
@@ -337,39 +336,7 @@ fn create_tooltrip<'a>(content:impl Into<Element<'a,Message>>,label:&'a str,on_p
     }
 
 }
-// async fn read_dir_meta<P>(path:P)->Result<(),std::io::Error>
-// where
-//     P:AsRef<Path>{
-//         let mut entries = tokio::fs::read_dir(path).await?;
-//         while let Some(entry) = entries.next_entry().await? {
-//             let path = entry.path();
-//             let meta = entry.metadata().await?;
-//             if meta.is_file(){
 
-//             }else if meta.is_dir(){
-
-//             }
-//         }
-//         Ok(())
-//     }
-
-// #[async_recursion]
-// async fn search_f<P>(path:P)->io::Result<u64>
-// where
-//     P:AsRef<Path>{
-//         let mut fsize:u64=0;
-//         let mut entries = tokio::fs::read_dir(path).await;
-//         while let Some(entry) = entries.next_entry().await? {
-//             let meta = entry.metadata().await?;
-//             if meta.is_file(){
-//                 fsize+=meta.len();
-//             }else if meta.is_dir(){
-//                 fsize+=search_f(&entry.path()).await?;
-//             }
-//         }
-
-//         Ok(())
-//     }
 trait CmpExtension {
     fn ancestor_cmp(&self,other:&u64)->Ordering;
 }
