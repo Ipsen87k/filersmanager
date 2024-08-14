@@ -68,3 +68,19 @@ pub async fn error_dialog_show(e:Error)->Null{
 
     Null{}
 }
+
+#[derive(Debug,Clone)]
+pub enum EntryType {
+    File,
+    Dir,
+}
+
+impl EntryType {
+    pub fn generate(path:&PathBuf)->Self{
+        if path.is_file(){
+            Self::File
+        }else{
+            Self::Dir
+        }
+    }
+}

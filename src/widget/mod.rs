@@ -2,12 +2,12 @@ use std::{fmt::Display, fs::Permissions, path::PathBuf, time::SystemTime};
 
 use chrono::{DateTime, Local};
 use iced::{
-    widget::{button, container, pick_list, scrollable, text, text_input},
+    widget::{button, container, pick_list, row, scrollable, text, Space,},
     Element, Length, Renderer, Theme,
 };
 use iced_table::table;
 
-use crate::Message;
+use crate::{file::EntryType, icon::{file_icon, folder_icon}, Message};
 
 pub struct TableState {
     pub columns: Vec<TableColumn>,
@@ -92,6 +92,7 @@ pub struct FileTableRow {
     filename: PathBuf,
     size: String,
     time:String,
+    entry_type:EntryType,
 }
 
 impl FileTableRow {
@@ -103,11 +104,13 @@ impl FileTableRow {
             },
             None => "".into(),
         };
+        let entry_type = EntryType::generate(&filename);
 
         Self {
             filename: filename,
             size: size,
             time:time,
+            entry_type:entry_type,
         }
     }
 
@@ -170,7 +173,14 @@ impl<'a> table::Column<'a, Message, Theme, Renderer> for TableColumn {
     ) -> Element<'a, Message, Theme, Renderer> {
         let content: Element<_> = match self.kind {
             ColumnKind::Index => text(row_index).into(),
-            ColumnKind::FileName => text(&row.filename.file_name().unwrap().to_str().unwrap()).into(),
+            ColumnKind::FileName => {
+                let icon = match row.entry_type {
+                    EntryType::File => file_icon(),
+                    EntryType::Dir => folder_icon(),
+                };
+
+                row!(icon,Space::with_width(Length::Fixed(10.)),text(&row.filename.file_name().unwrap().to_str().unwrap()),).into()
+            },
             ColumnKind::Size => text(&row.size).into(),
             ColumnKind::ModifiedTime => text(&row.time).into(),
             ColumnKind::Delete => button("delete").on_press(Message::Delete(row_index)).into(),
