@@ -1,63 +1,66 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
-use std::{cmp::Ordering, env, fs, path::{Path, PathBuf}, vec};
+use std::{
+    cmp::Ordering, env, fs::{self, Permissions}, path::{Path, PathBuf}, time::SystemTime, vec
+};
 
-use filersmanager::{file::{self, open_folder, output_folder_infos}, icon,error::Error};
-use iced::{executor, mouse, widget::{button, column, container, row, text, text_editor, text_input, tooltip, Column}, Application, Command, Element, Font, Length, Renderer, Settings, Theme};
+use filersmanager::{
+    error::Error,
+    file::{self, open_folder, output_folder_infos},
+    icon,
+    widget::{FileTableRow, TableState},
+    Message,
+};
+use iced::{
+    executor, mouse, widget::{
+        button, column, container, responsive, row, scrollable, space, text, text_input, tooltip
+    }, Application, Command, Element, Font, Length, Settings, Theme
+};
+use iced_table::table;
 
-const ONE_KELO_BYTE:f32 = 1024.0;
-const SIX_DIGITS:u64 = 999999;
-const NINE_DIGITS:u64 = 999999999;
+const ONE_KELO_BYTE: f32 = 1024.0;
+const FOUR_DIGITS:u64 = 9999;
+const SIX_DIGITS: u64 = 999999;
+const NINE_DIGITS: u64 = 999999999;
 
-fn main() -> iced::Result{
+fn main() -> iced::Result {
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("error"));
 
-    let icon = iced::window::icon::from_file_data(include_bytes!("../assets/icon/frsm_icon.jpg"), None);
-    if let Ok(icon) = icon{
+    let icon =
+        iced::window::icon::from_file_data(include_bytes!("../assets/icon/frsm_icon.jpg"), None);
+    if let Ok(icon) = icon {
         log::info!("iconあり");
-        AppState::run(Settings{
-            fonts:vec![include_bytes!("../assets/font/iced-image.ttf").as_slice().into()],
-            default_font:Font::MONOSPACE,
-            window:iced::window::Settings{
-                icon:Some(icon),
+        AppState::run(Settings {
+            fonts: vec![include_bytes!("../assets/font/iced-image.ttf")
+                .as_slice()
+                .into()],
+            default_font: Font::MONOSPACE,
+            window: iced::window::Settings {
+                icon: Some(icon),
                 ..Default::default()
             },
             ..Default::default()
         })
-    }else{
+    } else {
         log::info!("iconなし");
-        AppState::run(Settings{
-            fonts:vec![include_bytes!("../assets/font/iced-image.ttf").as_slice().into()],
-            default_font:Font::MONOSPACE,
+        AppState::run(Settings {
+            fonts: vec![include_bytes!("../assets/font/iced-image.ttf")
+                .as_slice()
+                .into()],
+            default_font: Font::MONOSPACE,
             ..Default::default()
         })
     }
 }
 
-
-struct AppState{
-    path:Option<PathBuf>,
-    path_input_value:String,
-    file_info_vec:Vec<(PathBuf,u64)>,
-    content:text_editor::Content,
+struct AppState {
+    path: Option<PathBuf>,
+    path_input_value: String,
+    total_size:String,
+    file_info_vec: Vec<(PathBuf, u64,Permissions,Option<SystemTime>)>,
+    table_state: TableState,
 }
 
-
-#[derive(Debug,Clone)]
-pub enum Message {
-    TextEditorOnAction(text_editor::Action),
-    OnInput(String),
-    OpenFolder,
-    FolderOpened(Option<PathBuf>),
-    OutputFileInfos,
-    FileSearch,
-    FileSerachedConvert(Vec<(PathBuf,u64)>),
-    FileSeached(Vec<String>),
-    EventOccured(iced::event::Event),
-    ErrorDialogShow(Result<(),Error>),
-    None(filersmanager::Null),
-}
-
-impl Application for AppState{
+impl Application for AppState {
     type Executor = executor::Default;
 
     type Message = Message;
@@ -72,11 +75,12 @@ impl Application for AppState{
 
     fn new(_flags: Self::Flags) -> (Self, iced::Command<Message>) {
         (
-            Self{
-                path:Some(PathBuf::from("")),
-                path_input_value:String::new(),
-                file_info_vec:vec![],
-                content:text_editor::Content::new(),
+            Self {
+                path: Some(PathBuf::from("")),
+                path_input_value: String::new(),
+                total_size:String::new(),
+                file_info_vec: vec![],
+                table_state: TableState::new(None),
             },
             Command::none(),
         )
@@ -84,150 +88,152 @@ impl Application for AppState{
 
     fn update(&mut self, message: Message) -> Command<Message> {
         match message {
-            Message::OnInput(value)=>{
+            Message::OnInput(value) => {
                 //"c:/temp"=>c:/temp として扱う
-                if value.starts_with('"') && value.ends_with('"'){
-                    let value = &value[1..value.len()-1];
+                if value.starts_with('"') && value.ends_with('"') {
+                    let value = &value[1..value.len() - 1];
                     self.path_input_value = String::from(value);
-                }else{
+                } else {
                     self.path_input_value = value;
                 }
             }
-            Message::FileSearch=>{
+            Message::FileSearch => {
                 //二回目初期化
                 self.file_info_vec.clear();
                 if let Some(path) = self.path.as_ref() {
-                    if path.exists(){
-                        if self.path_input_value.is_empty(){
+                    if path.exists() {
+                        if self.path_input_value.is_empty() {
                             let path = PathBuf::from(path);
-                            return Command::perform(filesize_collect(path), Message::FileSerachedConvert);
-                        }else{
+                            return Command::perform(
+                                filesize_collect(path),
+                                Message::FileSerachedConvert,
+                            );
+                        } else {
                             let path = PathBuf::from(&self.path_input_value);
-                            if path.exists(){
+                            if path.exists() {
                                 self.path = Some(path.clone());
-                                return Command::perform(filesize_collect(path), Message::FileSerachedConvert);
+                                return Command::perform(
+                                    filesize_collect(path),
+                                    Message::FileSerachedConvert,
+                                );
                             }
                         }
                     }
                 }
             }
-            Message::FileSerachedConvert(mut value)=>{
-                value.sort_by(|a,b| a.1.ancestor_cmp(&b.1));
+            Message::FileSerachedConvert(mut value) => {
+                value.sort_by(|a, b| a.1.ancestor_cmp(&b.1));
                 self.file_info_vec = value.clone();
                 return Command::perform(conv_fileinfovec_to_strvec(value), Message::FileSeached);
             }
-            Message::FileSeached(value)=>{
-                self.content = text_editor::Content::with_text(value.join("\n").as_str());
+            Message::FileSeached((file_table_rows,total_size)) => {
+                self.table_state.set_rows(file_table_rows);
+                self.total_size = total_size;
             }
-            Message::TextEditorOnAction(action)=>{
-                if let text_editor::Action::Click(_p) = action.clone(){
-                    self.content.perform(action);
-                    self.content.perform(text_editor::Action::SelectLine);
-                    return Command::none()
-                }
-                else if let text_editor::Action::Edit(edit) = action.clone(){
-                    //fallthrough Pasteのみaction起こす
-                    match edit {
-                        text_editor::Edit::Paste(_v)=>{
-                        }
-                        _=>{
-                            return Command::none();
-                        }
-                    }
-                }
-                self.content.perform(action);
-            }
-            Message::OpenFolder=>{
+            Message::OpenFolder => {
                 return Command::perform(open_folder(), Message::FolderOpened);
             }
-            Message::FolderOpened(path)=>{
-                if let Some(path) = path{
+            Message::FolderOpened(path) => {
+                if let Some(path) = path {
                     self.path = Some(path.clone());
                     return Command::perform(filesize_collect(path), Message::FileSerachedConvert);
                 }
             }
-            Message::OutputFileInfos=>{
-                let text = self.content.text();
-                if text.is_empty(){
+            Message::OutputFileInfos => {
+                let text = "self.content.text()";
+                if text.is_empty() {
                     return Command::none();
-                }else{
-                    return Command::perform(output_folder_infos(text),Message::ErrorDialogShow)
+                } else {
+                    return Command::perform(output_folder_infos(text), Message::ErrorDialogShow);
                 }
             }
-            Message::EventOccured(event)=>{
-                match event {
-                    iced::Event::Keyboard(_) => {
-
-                    },
-                    iced::Event::Mouse(mouse_event) => {
-                        match mouse_event {
-                            mouse::Event::CursorEntered => {},
-                            mouse::Event::CursorLeft => {},
-                            mouse::Event::CursorMoved { position:_ } => {
-                            },
-                            mouse::Event::ButtonPressed(btn) => {
-                                if btn == iced::mouse::Button::Right{
-                                    self.content.perform(text_editor::Action::SelectLine);
-                                    if let Some(selected_file) = self.content.selection(){
-                                        let filename = selected_file.split('\t').collect::<Vec<&str>>();
-                                        let filename = String::from(filename[0]);
-                                        let path = self.path.as_ref().unwrap().join(filename);
-                                        return Command::perform(file::remove_file_dialog(path), Message::ErrorDialogShow);
-                                    }
-                                }
-                            },
-                            mouse::Event::ButtonReleased(_) => {},
-                            mouse::Event::WheelScrolled { delta :_} => {
-                            },
+            Message::EventOccured(event) => match event {
+                iced::Event::Keyboard(_) => {}
+                iced::Event::Mouse(mouse_event) => match mouse_event {
+                    mouse::Event::CursorEntered => {}
+                    mouse::Event::CursorLeft => {}
+                    mouse::Event::CursorMoved { position: _ } => {}
+                    mouse::Event::ButtonPressed(btn) => {
+                        if btn == iced::mouse::Button::Right {
                         }
-                    },
-                    iced::Event::Window(_, _) => {
-                    },
-                    iced::Event::Touch(_) => {
-
-                    },
-                }
-            }
-            Message::ErrorDialogShow(result)=>{
-                if let Err(e) = result  {
-                    log::error!("{}",e);
+                    }
+                    mouse::Event::ButtonReleased(_) => {}
+                    mouse::Event::WheelScrolled { delta: _ } => {}
+                },
+                iced::Event::Window(_, _) => {}
+                iced::Event::Touch(_) => {}
+            },
+            Message::ErrorDialogShow(result) => {
+                if let Err(e) = result {
+                    log::error!("{}", e);
                     return Command::perform(file::error_dialog_show(e), Message::None);
                 }
             }
-            Message::None(_null)=>{
-
+            Message::None(_null) => {}
+            Message::SyncHeader(offset) => {
+                return Command::batch(vec![scrollable::scroll_to(
+                    self.table_state.header.clone(),
+                    offset,
+                )])
+            }
+            Message::Resizing(index,offset)=>{
+                if let Some(column) = self.table_state.columns.get_mut(index){
+                    column.resize_offset = Some(offset);
+                }
+            }
+            Message::Resized=>{
+                self.table_state.columns.iter_mut().for_each(|column|{
+                    if let Some(offset) = column.resize_offset.take(){
+                        column.width+=offset;
+                    }
+            })}
+            Message::Delete(index)=>{
+                let path = self.table_state.rows[index].get_filepath();
+                self.table_state.rows.remove(index);
+                return Command::perform(file::remove_file_dialog(path), Message::ErrorDialogShow);
             }
         }
         Command::none()
     }
 
     fn view(&self) -> iced::Element<'_, Message> {
-        let path_input = text_input("please input pass", &self.path_input_value).on_input(Message::OnInput);
+        let path_input =
+            text_input("please input pass", &self.path_input_value).on_input(Message::OnInput);
         let run_button = button(container(icon::search_icon())).on_press(Message::FileSearch);
 
-        let top_control = row!(path_input,run_button);
+        let top_control = row!(path_input, run_button);
         let sub_func = row!(
-            create_tooltrip(icon::open_folder_icon(), "開きたいフォルダを選択", Some(Message::OpenFolder)),
+            create_tooltrip(
+                icon::open_folder_icon(),
+                "開きたいフォルダを選択",
+                Some(Message::OpenFolder)
+            ),
             create_tooltrip(icon::output_icon(), "出力", Some(Message::OutputFileInfos)),
         );
 
-        let control = column!(
-            top_control,
-            sub_func
-        );
-        if self.file_info_vec.is_empty(){
+        let table = responsive(|size| {
+            table(
+                self.table_state.header.clone(),
+                self.table_state.body.clone(),
+                &self.table_state.columns,
+                &self.table_state.rows,
+                Message::SyncHeader,
+            ).on_column_resize(Message::Resizing,Message::Resized)
+            .min_width(size.width).into()
+        });
+        let control = column!(top_control, sub_func, table,);
+        if self.file_info_vec.is_empty() {
             container(control).into()
-        }else{
-            container(
-                column!(
-                    control,
-                    text_editor(&self.content)
-                        .height(Length::Fill)
-                        .on_action(Message::TextEditorOnAction)
-                        ,
+        } else {
+            container(column!(
+                control,
+                row!(
                     text(self.path.as_ref().unwrap().display()),
+                    space::Space::with_width(Length::Fill),
+                    text(format!("total:{}",&self.total_size)),
                 )
-            ).into()
+            ))
+            .into()
         }
     }
 
@@ -240,111 +246,114 @@ impl Application for AppState{
     }
 }
 
-#[allow(dead_code)]
-fn widget_list<'a>(targets:Vec<String>)->Column<'a,Message>{
-    let mut vec:Vec<Element<'_, Message, Theme, Renderer>> = vec![];
 
-    for (_idx,str) in targets.iter().enumerate(){
-
-        let tx = text(str);
-
-        vec.push(tx.into());
-    }
-    Column::from_vec(vec)
-}
-
-async fn conv_fileinfovec_to_strvec(vec:Vec<(PathBuf,u64)>)->Vec<String>{
+async fn conv_fileinfovec_to_strvec(vec: Vec<(PathBuf, u64,Permissions,Option<SystemTime>)>) ->(Vec<FileTableRow>,String) {
     let mut total_size = 0;
-    let mut fileinfo_str_vec= vec
-        .iter()
-        .map(|(k,v)| {
-            let fsize = *v as f32;
-            total_size+=*v;
-            if *v< SIX_DIGITS{
-                format!("{}\t{}bytes",k.file_name().unwrap().to_str().unwrap(),v)
-            }else if SIX_DIGITS < *v && *v < NINE_DIGITS{
-                let mb_size = fsize / (ONE_KELO_BYTE*ONE_KELO_BYTE);
-                format!("{}\t{:.2}MB",k.file_name().unwrap().to_str().unwrap(),mb_size)
-            }else{
-                let gb_size = fsize/(ONE_KELO_BYTE*ONE_KELO_BYTE*ONE_KELO_BYTE);
+    let fileinfo_str_vec = vec
+        .into_iter()
+        .map(|(filename,size,perm,time)| {
+            let size_str = calc_unit(size);
+            total_size += size;
 
-                format!("{}\t{:.2}GB",k.file_name().unwrap().to_str().unwrap(),gb_size)
-            }
+            FileTableRow::generate(filename, size_str,time)
         })
-        .collect::<Vec<String>>();
+        .collect();
 
-    let gb_size = total_size as f32 / (ONE_KELO_BYTE*ONE_KELO_BYTE*ONE_KELO_BYTE);
-    fileinfo_str_vec.insert(0,format!("totalsize\t\t{:.2}GB",gb_size));
-    fileinfo_str_vec
+    (fileinfo_str_vec,calc_unit(total_size))
 }
 
-fn serach_file<P>(path:P)->u64
-where
-    P:AsRef<Path>{
+fn calc_unit(size:u64)->String{
+    let fsize= size as f32;
+    if size <= SIX_DIGITS{
+        let kb_size = fsize / ONE_KELO_BYTE;
+        format!("{:.2}kb",kb_size)
+    }else if size <= NINE_DIGITS{
+        let mb_size = fsize / (ONE_KELO_BYTE * ONE_KELO_BYTE);
+        format!("{:.2}MB",mb_size)
+    }else{
+        let gb_size = fsize / (ONE_KELO_BYTE * ONE_KELO_BYTE * ONE_KELO_BYTE);
+        format!("{:.2}GB",gb_size)
+    }
+}
 
-        let mut fsize = 0;
-        if let Ok(entries) = fs::read_dir(path) {
-            for entry in entries{
-                if let Ok(entry) = entry{
-                    if let Ok(meta) = entry.metadata(){
-                        if meta.is_file(){
-                            fsize+=meta.len();
-                        }else if meta.is_dir() {
-                            fsize+=serach_file(entry.path());
-                        }
+fn serach_file<P>(path: P) -> u64
+where
+    P: AsRef<Path>,
+{
+    let mut fsize = 0;
+    if let Ok(entries) = fs::read_dir(path) {
+        for entry in entries {
+            if let Ok(entry) = entry {
+                if let Ok(meta) = entry.metadata() {
+                    if meta.is_file() {
+                        fsize += meta.len();
+                    } else if meta.is_dir() {
+                        fsize += serach_file(entry.path());
                     }
                 }
             }
         }
-        return fsize;
     }
-async fn filesize_collect<P>(path:P)->Vec<(PathBuf,u64)>
+    return fsize;
+}
+async fn filesize_collect<P>(path: P) -> Vec<(PathBuf, u64,Permissions,Option<SystemTime>)>
 where
-    P:AsRef<Path>{
-        let mut file_info_vec = vec![];
-        if let Ok(entries) = fs::read_dir(path){
-            for entry in entries{
-                if let  Ok(entry) = entry{
-                    let path = entry.path();
-                    if let Ok(meta) = entry.metadata(){
-                        if meta.is_file(){
-                            file_info_vec.push((path,meta.len()));
-                        }else if meta.is_dir(){
-                            let total_size = serach_file(&path);
-                            file_info_vec.push((path,total_size));
-                        }
+    P: AsRef<Path>,
+{
+    let mut file_info_vec = vec![];
+    if let Ok(entries) = fs::read_dir(path) {
+        for entry in entries {
+            if let Ok(entry) = entry {
+                let path = entry.path();
+                if let Ok(meta) = entry.metadata() {
+                    let accessed_time = match meta.accessed() {
+                        Ok(time) => Some(time),
+                        Err(_) => None,
+                    };
+                    if meta.is_file() {
+                        file_info_vec.push((path, meta.len(),meta.permissions(),accessed_time));
+                    } else if meta.is_dir() {
+                        let total_size = serach_file(&path);
+                        file_info_vec.push((path, total_size,meta.permissions(),accessed_time));
                     }
                 }
             }
         }
-        file_info_vec
     }
+    file_info_vec
+}
 
-
-fn create_tooltrip<'a>(content:impl Into<Element<'a,Message>>,label:&'a str,on_press:Option<Message>)->Element<'a,Message>{
+fn create_tooltrip<'a>(
+    content: impl Into<Element<'a, Message>>,
+    label: &'a str,
+    on_press: Option<Message>,
+) -> Element<'a, Message> {
     let btn = button(container(content));
 
-    if let Some(on_press) = on_press{
+    if let Some(on_press) = on_press {
         tooltip(
             btn.on_press(on_press),
             label,
             tooltip::Position::FollowCursor,
         )
         .into()
-    }else{
+    } else {
         btn.into()
     }
-
 }
 
 trait CmpExtension {
-    fn ancestor_cmp(&self,other:&u64)->Ordering;
+    fn ancestor_cmp(&self, other: &u64) -> Ordering;
 }
 
 impl CmpExtension for u64 {
-    fn ancestor_cmp(&self,other:&u64)->Ordering {
-        if *self < *other {Ordering::Greater}
-        else if *self == *other {Ordering::Equal}
-        else {Ordering::Less}
+    fn ancestor_cmp(&self, other: &u64) -> Ordering {
+        if *self < *other {
+            Ordering::Greater
+        } else if *self == *other {
+            Ordering::Equal
+        } else {
+            Ordering::Less
+        }
     }
 }

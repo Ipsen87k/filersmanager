@@ -8,8 +8,10 @@ authors = ["Ipsen87k <gyt3218@gmail.com>"]
 
 [dependencies]
 async-recursion = "1.1.0"
+chrono = "0.4.38"
 env_logger = "0.11.3"
-iced = {version = "0.12.1" , features = ["debug","tokio","image"]}
+iced = {version = "0.12.1" , features = ["debug","tokio","lazy","image"]}
+iced_table = "0.12.0"
 log = "0.4.21"
 rfd = "0.14.1"
 tokio = {version = "1.37.0", features = ["fs"]}
