@@ -1,6 +1,7 @@
 # DEMO
  
- ![image](https://github.com/user-attachments/assets/75951184-05f6-4cf6-b37a-ca11a495fe79) 
+![image](https://github.com/user-attachments/assets/29349c20-b486-419e-9728-58257641e13e)
+
  
 # Installation
 ### Windows Ubuntu
