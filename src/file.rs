@@ -16,7 +16,7 @@ pub async fn open_folder()->Option<PathBuf>{
     }
 }
 
-pub async fn output_folder_infos(content:&str)->Result<(),Error>{
+pub async fn output_folder_infos(content:String)->Result<(),Error>{
     let path = rfd::AsyncFileDialog::new()
         .save_file()
         .await

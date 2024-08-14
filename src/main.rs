@@ -140,7 +140,7 @@ impl Application for AppState {
                 }
             }
             Message::OutputFileInfos => {
-                let text = "self.content.text()";
+                let text = self.table_state.rows.iter().map(|row|{row.to_string()}).collect::<Vec<String>>().join("\n");
                 if text.is_empty() {
                     return Command::none();
                 } else {

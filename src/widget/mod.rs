@@ -116,6 +116,13 @@ impl FileTableRow {
     }
 }
 
+impl ToString for FileTableRow {
+    fn to_string(&self) -> String {
+        let filename=self.filename.file_name().unwrap().to_str().unwrap();
+        format!("{}\t{}\t{}",filename,&self.size,&self.time)
+    }
+}
+
 pub struct TableColumn {
     kind: ColumnKind,
     pub width: f32,

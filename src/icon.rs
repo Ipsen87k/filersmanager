@@ -17,3 +17,11 @@ pub fn open_folder_icon<'a,T>()->Element<'a,T>{
 pub fn search_icon<'a,T>()->Element<'a,T>{
     icon('\u{0e803}')
 }
+
+pub fn folder_icon<'a,T>()->Element<'a,T>{
+    icon('\u{0e804}')
+}
+
+pub fn file_icon<'a,T>()->Element<'a,T>{
+    icon('\u{0e805}')
+}
