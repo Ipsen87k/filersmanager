@@ -18,7 +18,6 @@ use iced::{
 use iced_table::table;
 
 const ONE_KELO_BYTE: f32 = 1024.0;
-const FOUR_DIGITS:u64 = 9999;
 const SIX_DIGITS: u64 = 999999;
 const NINE_DIGITS: u64 = 999999999;
 
@@ -26,30 +25,16 @@ fn main() -> iced::Result {
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("error"));
 
     let icon =
-        iced::window::icon::from_file_data(include_bytes!("../assets/icon/frsm_icon.jpg"), None);
-    if let Ok(icon) = icon {
-        log::info!("iconあり");
-        AppState::run(Settings {
-            fonts: vec![include_bytes!("../assets/font/iced-image.ttf")
-                .as_slice()
-                .into()],
-            default_font: Font::MONOSPACE,
-            window: iced::window::Settings {
-                icon: Some(icon),
-                ..Default::default()
-            },
+        iced::window::icon::from_file_data(include_bytes!("../assets/icon/frsm_icon.jpg"), None).unwrap();
+    AppState::run(Settings {
+        fonts: vec![include_bytes!("../assets/font/iced-image.ttf").as_slice().into(),include_bytes!("../assets/font/07LogoTypeGothic7.ttf").as_slice().into()],
+        default_font: Font::with_name("07ロゴたいぷゴシック7"),
+        window: iced::window::Settings {
+            icon: Some(icon),
             ..Default::default()
-        })
-    } else {
-        log::info!("iconなし");
-        AppState::run(Settings {
-            fonts: vec![include_bytes!("../assets/font/iced-image.ttf")
-                .as_slice()
-                .into()],
-            default_font: Font::MONOSPACE,
-            ..Default::default()
-        })
-    }
+        },
+        ..Default::default()
+    })
 }
 
 struct AppState {

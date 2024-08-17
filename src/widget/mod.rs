@@ -2,8 +2,7 @@ use std::{fmt::Display, fs::Permissions, path::PathBuf, time::SystemTime};
 
 use chrono::{DateTime, Local};
 use iced::{
-    widget::{button, container, pick_list, row, scrollable, text, Space,},
-    Element, Length, Renderer, Theme,
+    widget::{button, container, pick_list, row, scrollable, text, Space,}, Element, Font, Length, Renderer, Theme
 };
 use iced_table::table;
 
